@@ -1,40 +1,35 @@
-import requests
+# threat_intelligence_engine.py
 import json
-import time
+import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
-import os
-from dotenv import load_dotenv
 from collections import defaultdict
 
-# Load API keys from environment
-load_dotenv()
+from shodan_client import ShodanClient
+from virustotal_client import VirusTotalClient
+from cisa_kev_client import CISAKEVClient
+from vulners_client import VulnersClient
+from nvd_client import NVDClient
 
 class ThreatIntelligenceEngine:
     def __init__(self):
-        # API Keys
-        self.shodan_api_key = os.getenv('SHODAN_API_KEY', 'demo_key')
-        self.virustotal_api_key = os.getenv('VIRUSTOTAL_API_KEY', 'demo_key')
-        self.vulners_api_key = os.getenv('VULNERS_API_KEY', 'demo_key')
+        """Initialize all threat intelligence clients"""
+        self.clients = {
+            'shodan': ShodanClient(),
+            'virustotal': VirusTotalClient(),
+            'cisa_kev': CISAKEVClient(),
+            'vulners': VulnersClient(),
+            'nvd': NVDClient()
+        }
         
         # Demo mode flag
-        self.demo_mode = any(key == 'demo_key' for key in 
-                            [self.shodan_api_key, self.virustotal_api_key, self.vulners_api_key])
-        
-        # API Endpoints
-        self.apis = {
-            'shodan': 'https://api.shodan.io',
-            'virustotal': 'https://www.virustotal.com/api/v3',
-            'nvd': 'https://services.nvd.nist.gov/rest/json/cves/2.0',
-            'cisa_kev': 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
-        }
-        
-        # Headers
-        self.headers = {
-            'virustotal': {'x-apikey': self.virustotal_api_key}
-        }
-
-    def process_layer1_data(self, scan_data: Dict = None) -> Dict:
+        self.demo_mode = (
+            self.clients['shodan'].demo_mode or
+            self.clients['virustotal'].demo_mode or
+            self.clients['vulners'].demo_mode
+        )
+    
+    def process_layer1_data(self, scan_data: Dict = None) -> Dict[str, Any]:
         """Process sample data from Layer 1 (Vulnerability Scanning)"""
         default_data = {
             "host": "192.168.1.10",
@@ -61,199 +56,40 @@ class ThreatIntelligenceEngine:
             }
         }
         return scan_data if scan_data else default_data
-
-    def query_shodan(self, ip_address: str) -> Dict:
-        """Query Shodan for IP intelligence"""
-        if self.demo_mode:
-            return self._demo_shodan_response(ip_address)
+    
+    def collect_intelligence(self, processed_data: Dict) -> Dict[str, Any]:
+        """Collect intelligence from all sources"""
+        # Extract indicators
+        ip_address = processed_data.get('ip', processed_data.get('host', '8.8.8.8'))
+        cve_list = [
+            vuln['cve'] for vuln in processed_data.get('vulnerabilities', [])
+            if isinstance(vuln, dict) and 'cve' in vuln
+        ]
         
-        try:
-            url = f"{self.apis['shodan']}/shodan/host/{ip_address}"
-            params = {'key': self.shodan_api_key}
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'success': True,
-                    'data': {
-                        'ip': data.get('ip_str'),
-                        'ports': data.get('ports', []),
-                        'vulnerabilities': list(data.get('vulns', {}).keys()),
-                        'hostnames': data.get('hostnames', []),
-                        'org': data.get('org', 'Unknown'),
-                        'isp': data.get('isp', 'Unknown'),
-                        'location': data.get('location', {}),
-                        'last_update': data.get('last_update', '')
-                    }
-                }
-            return {'success': False, 'error': f'HTTP {response.status_code}', 'data': {}}
-        except Exception as e:
-            return {'success': False, 'error': str(e), 'data': {}}
-
-    def _demo_shodan_response(self, ip_address: str) -> Dict:
-        """Demo response for Shodan"""
-        return {
-            'success': True,
-            'data': {
-                'ip': ip_address,
-                'ports': [22, 80, 443, 8080],
-                'vulnerabilities': ['CVE-2021-44228', 'CVE-2022-22965'],
-                'hostnames': [f'host-{ip_address.replace(".", "-")}.example.com'],
-                'org': 'Demo Corporation',
-                'isp': 'Demo ISP',
-                'location': {'city': 'Demo City', 'country': 'Demo Country'},
-                'last_update': datetime.now().isoformat()
-            }
+        print(f"Collecting intelligence for IP: {ip_address}")
+        print(f"Analyzing {len(cve_list)} CVEs...")
+        
+        # Query all intelligence sources
+        results = {
+            'scan_data': processed_data,
+            'shodan': self.clients['shodan'].query_ip(ip_address),
+            'virustotal': self.clients['virustotal'].query_ip(ip_address),
+            'nvd': self.clients['nvd'].query_cves(cve_list),
+            'cisa_kev': self.clients['cisa_kev'].query_kev(),
+            'vulners': self.clients['vulners'].query_vulnerabilities(cve_list)
         }
-
-    def query_virustotal(self, indicators: Dict) -> Dict:
-        """Query VirusTotal for indicators"""
-        if self.demo_mode:
-            return self._demo_virustotal_response(indicators)
         
-        try:
-            headers = self.headers['virustotal']
-            results = {}
-            
-            if 'ip' in indicators:
-                url = f"{self.apis['virustotal']}/ip_addresses/{indicators['ip']}"
-                response = requests.get(url, headers=headers, timeout=10)
-                if response.status_code == 200:
-                    results['ip_analysis'] = response.json().get('data', {})
-            
-            return {'success': True, 'data': results}
-        except Exception as e:
-            return {'success': False, 'error': str(e), 'data': {}}
-
-    def _demo_virustotal_response(self, indicators: Dict) -> Dict:
-        """Demo response for VirusTotal"""
-        return {
-            'success': True,
-            'data': {
-                'ip_analysis': {
-                    'malicious': 2,
-                    'suspicious': 1,
-                    'undetected': 45,
-                    'harmless': 52,
-                    'reputation': -5,
-                    'last_analysis_stats': {
-                        'malicious': 2,
-                        'suspicious': 1,
-                        'undetected': 45,
-                        'harmless': 52
-                    }
-                }
-            }
-        }
-
-    def query_nvd(self, cves: List[str]) -> Dict:
-        """Query NVD for CVE details"""
-        results = {}
-        
-        for cve_id in cves[:3]:  # Limit for demo
-            if self.demo_mode:
-                results[cve_id] = self._demo_nvd_response(cve_id)
-            else:
-                try:
-                    url = f"{self.apis['nvd']}?cveId={cve_id}"
-                    response = requests.get(url, timeout=10)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if 'vulnerabilities' in data and data['vulnerabilities']:
-                            cve_data = data['vulnerabilities'][0]['cve']
-                            metrics = self._extract_cvss_metrics(cve_data)
-                            
-                            results[cve_id] = {
-                                'description': cve_data.get('descriptions', [{}])[0].get('value', ''),
-                                'published_date': cve_data.get('published', ''),
-                                'cvss_metrics': metrics,
-                                'severity': self._get_severity_level(metrics.get('baseScore', 0))
-                            }
-                    time.sleep(1)  # Rate limiting
-                except Exception as e:
-                    results[cve_id] = {'error': str(e)}
-        
-        return {'success': True, 'data': results}
-
-    def _demo_nvd_response(self, cve_id: str) -> Dict:
-        """Demo response for NVD"""
-        demo_data = {
-            'CVE-2021-44228': {
-                'description': 'Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases 2.12.2, 2.12.3, and 2.3.1) JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.',
-                'published_date': '2021-12-10T20:15:00Z',
-                'cvss_metrics': {'baseScore': 10.0, 'baseSeverity': 'CRITICAL'},
-                'severity': 'CRITICAL'
-            },
-            'CVE-2022-22965': {
-                'description': 'Spring Framework prior to versions 5.3.18 and 5.2.20 and corresponding older versions suffers from a remote code execution vulnerability.',
-                'published_date': '2022-03-31T19:15:00Z',
-                'cvss_metrics': {'baseScore': 9.8, 'baseSeverity': 'CRITICAL'},
-                'severity': 'CRITICAL'
-            },
-            'CVE-2021-41617': {
-                'description': 'sshd in OpenSSH 6.2 through 8.7 allows remote attackers to cause a denial of service.',
-                'published_date': '2021-09-15T07:15:00Z',
-                'cvss_metrics': {'baseScore': 7.5, 'baseSeverity': 'HIGH'},
-                'severity': 'HIGH'
-            }
-        }
-        return demo_data.get(cve_id, {'description': 'Unknown CVE', 'cvss_metrics': {'baseScore': 0}})
-
-    def _extract_cvss_metrics(self, cve_data: Dict) -> Dict:
-        """Extract CVSS metrics from NVD response"""
-        metrics = {}
-        if 'metrics' in cve_data:
-            if 'cvssMetricV31' in cve_data['metrics']:
-                metrics = cve_data['metrics']['cvssMetricV31'][0]['cvssData']
-            elif 'cvssMetricV30' in cve_data['metrics']:
-                metrics = cve_data['metrics']['cvssMetricV30'][0]['cvssData']
-            elif 'cvssMetricV2' in cve_data['metrics']:
-                metrics = cve_data['metrics']['cvssMetricV2'][0]['cvssData']
-        return metrics
-
-    def _get_severity_level(self, score: float) -> str:
-        """Convert CVSS score to severity level"""
-        if score >= 9.0:
-            return 'CRITICAL'
-        elif score >= 7.0:
-            return 'HIGH'
-        elif score >= 4.0:
-            return 'MEDIUM'
-        elif score > 0:
-            return 'LOW'
-        return 'INFO'
-
-    def query_cisa_kev(self) -> Dict:
-        """Query CISA Known Exploited Vulnerabilities"""
-        try:
-            response = requests.get(self.apis['cisa_kev'], timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                vulnerabilities = data.get('vulnerabilities', [])
-                
-                kev_dict = {}
-                for vuln in vulnerabilities[:100]:
-                    cve_id = vuln.get('cveID')
-                    kev_dict[cve_id] = {
-                        'date_added': vuln.get('dateAdded'),
-                        'short_description': vuln.get('shortDescription'),
-                        'required_action': vuln.get('requiredAction'),
-                        'known_ransomware_use': vuln.get('knownRansomwareCampaignUse', False)
-                    }
-                
-                return {'success': True, 'data': kev_dict, 'total_count': len(vulnerabilities)}
-            return {'success': False, 'error': f'HTTP {response.status_code}', 'data': {}}
-        except Exception as e:
-            return {'success': False, 'error': str(e), 'data': {}}
-
-    def generate_visual_analytics(self, threat_data: Dict) -> Dict:
+        return results
+    
+    def generate_visual_analytics(self, results: Dict) -> Dict[str, Any]:
         """Generate visual analytics from threat intelligence data"""
         visuals = {}
         
-        # Extract NVD data safely
-        nvd_data = threat_data.get('nvd_results', {}).get('data', {})
+        # Extract data
+        nvd_data = results.get('nvd', {}).get('data', {})
+        kev_data = results.get('cisa_kev', {}).get('data', {})
+        scan_data = results.get('scan_data', {})
+        shodan_data = results.get('shodan', {}).get('data', {})
         
         # 1. CVE Severity Distribution
         severity_counts = defaultdict(int)
@@ -294,11 +130,10 @@ class ThreatIntelligenceEngine:
             }
         
         # 3. KEV Status
-        kev_data = threat_data.get('cisa_kev_results', {}).get('data', {})
-        scan_cves = []
-        if 'scan_data' in threat_data:
-            vulnerabilities = threat_data['scan_data'].get('vulnerabilities', [])
-            scan_cves = [v.get('cve') for v in vulnerabilities if isinstance(v, dict) and 'cve' in v]
+        scan_cves = [
+            v.get('cve') for v in scan_data.get('vulnerabilities', [])
+            if isinstance(v, dict) and 'cve' in v
+        ]
         
         if kev_data and scan_cves:
             kev_cves = set(kev_data.keys())
@@ -314,32 +149,7 @@ class ThreatIntelligenceEngine:
                 'percentage_in_kev': round(in_kev/len(scan_cves)*100, 1) if scan_cves else 0
             }
         
-        # 4. Threat Timeline
-        timeline_data = []
-        for cve_id, details in nvd_data.items():
-            if isinstance(details, dict) and details.get('published_date'):
-                try:
-                    date_str = details['published_date'].split('T')[0]
-                    timeline_data.append({
-                        'date': date_str,
-                        'cve': cve_id,
-                        'score': details.get('cvss_metrics', {}).get('baseScore', 0)
-                    })
-                except:
-                    continue
-        
-        if timeline_data:
-            visuals['timeline'] = {
-                'type': 'timeline',
-                'data': sorted(timeline_data, key=lambda x: x['date']),
-                'date_range': {
-                    'start': min(t['date'] for t in timeline_data),
-                    'end': max(t['date'] for t in timeline_data)
-                }
-            }
-        
-        # 5. Shodan Exposure Summary
-        shodan_data = threat_data.get('shodan_results', {}).get('data', {})
+        # 4. Shodan Exposure Summary
         if shodan_data:
             visuals['shodan_summary'] = {
                 'type': 'exposure_summary',
@@ -350,22 +160,15 @@ class ThreatIntelligenceEngine:
             }
         
         return visuals
-
-    def generate_summary(self, results: Dict, visuals: Dict) -> Dict:
+    
+    def generate_summary(self, results: Dict) -> Dict[str, Any]:
         """Generate executive summary"""
-        
-        # Get vulnerabilities from scan data
         scan_data = results.get('scan_data', {})
         vulnerabilities = scan_data.get('vulnerabilities', [])
-        
-        # Get CVE IDs from vulnerabilities list
-        scan_cves = []
-        for vuln in vulnerabilities:
-            if isinstance(vuln, dict) and 'cve' in vuln:
-                scan_cves.append(vuln['cve'])
-        
-        # Get NVD data
-        nvd_data = results.get('nvd_results', {}).get('data', {})
+        nvd_data = results.get('nvd', {}).get('data', {})
+        kev_data = results.get('cisa_kev', {}).get('data', {})
+        vt_data = results.get('virustotal', {}).get('data', {}).get('ip_analysis', {})
+        shodan_data = results.get('shodan', {}).get('data', {})
         
         # Calculate CVSS statistics
         cvss_scores = []
@@ -375,15 +178,12 @@ class ThreatIntelligenceEngine:
                 if score > 0:
                     cvss_scores.append(score)
         
-        # Get KEV data
-        kev_data = results.get('cisa_kev_results', {}).get('data', {})
-        
         # Count KEV matches
+        scan_cves = [v.get('cve') for v in vulnerabilities if isinstance(v, dict) and 'cve' in v]
         kev_matches = 0
         if kev_data:
             kev_cves = set(kev_data.keys())
-            scan_cve_set = set(scan_cves)
-            kev_matches = len(kev_cves.intersection(scan_cve_set))
+            kev_matches = len(set(scan_cves).intersection(kev_cves))
         
         # Determine overall threat level
         threat_level = "LOW"
@@ -396,29 +196,33 @@ class ThreatIntelligenceEngine:
             elif max_score >= 4.0:
                 threat_level = "MEDIUM"
         
-        # Get VirusTotal data
-        vt_data = results.get('virustotal_results', {}).get('data', {}).get('ip_analysis', {})
+        # VirusTotal data
         malicious_count = vt_data.get('malicious', 0) if isinstance(vt_data, dict) else 0
         
-        summary = {
+        # Shodan data
+        exposed_ports = len(shodan_data.get('ports', [])) if shodan_data else 0
+        
+        return {
             'total_vulnerabilities': len(vulnerabilities),
             'unique_cves_analyzed': len(nvd_data),
             'cves_in_kev': kev_matches,
             'highest_cvss_score': max(cvss_scores) if cvss_scores else 0,
             'average_cvss_score': round(sum(cvss_scores)/len(cvss_scores), 1) if cvss_scores else 0,
             'threat_level': threat_level,
-            'exposed_ports': len(scan_data.get('ports', [])),
+            'exposed_ports': exposed_ports,
             'malicious_indicators': malicious_count
         }
-        
-        return summary
-
+    
     def generate_recommendations(self, results: Dict) -> List[str]:
         """Generate actionable recommendations"""
         recommendations = []
         
-        # Check for critical CVEs from NVD
-        nvd_data = results.get('nvd_results', {}).get('data', {})
+        nvd_data = results.get('nvd', {}).get('data', {})
+        kev_data = results.get('cisa_kev', {}).get('data', {})
+        scan_data = results.get('scan_data', {})
+        shodan_data = results.get('shodan', {}).get('data', {})
+        
+        # Check critical CVEs
         for cve_id, details in nvd_data.items():
             if isinstance(details, dict):
                 score = details.get('cvss_metrics', {}).get('baseScore', 0)
@@ -426,11 +230,7 @@ class ThreatIntelligenceEngine:
                     recommendations.append(f"IMMEDIATE ACTION: Patch {cve_id} (CVSS: {score})")
         
         # Check CISA KEV
-        kev_data = results.get('cisa_kev_results', {}).get('data', {})
-        scan_data = results.get('scan_data', {})
-        vulnerabilities = scan_data.get('vulnerabilities', [])
-        
-        for vuln in vulnerabilities:
+        for vuln in scan_data.get('vulnerabilities', []):
             if isinstance(vuln, dict):
                 cve_id = vuln.get('cve')
                 if cve_id in kev_data:
@@ -441,7 +241,6 @@ class ThreatIntelligenceEngine:
                     recommendations.append(rec)
         
         # Check Shodan exposure
-        shodan_data = results.get('shodan_results', {}).get('data', {})
         if shodan_data and shodan_data.get('ports'):
             open_ports = len(shodan_data['ports'])
             if open_ports > 5:
@@ -458,8 +257,8 @@ class ThreatIntelligenceEngine:
             ])
         
         return recommendations[:5]
-
-    def generate_risk_assessment(self, results: Dict, summary: Dict) -> Dict:
+    
+    def generate_risk_assessment(self, results: Dict, summary: Dict) -> Dict[str, Any]:
         """Generate risk assessment based on all intelligence"""
         risk_score = 0
         risk_factors = []
@@ -518,35 +317,20 @@ class ThreatIntelligenceEngine:
                 'exposure_impact': exposure_factor
             }
         }
-
-    def generate_threat_report(self, layer1_data: Dict = None) -> Dict:
+    
+    def generate_threat_report(self, layer1_data: Dict = None) -> Dict[str, Any]:
         """Main function to generate comprehensive threat report"""
         print("Processing Layer 1 data...")
         processed_data = self.process_layer1_data(layer1_data)
         
-        print("Querying threat intelligence APIs...")
-        
-        # Extract indicators
-        ip_address = processed_data.get('ip', processed_data.get('host', '8.8.8.8'))
-        cve_list = []
-        for vuln in processed_data.get('vulnerabilities', []):
-            if isinstance(vuln, dict) and 'cve' in vuln:
-                cve_list.append(vuln['cve'])
-        
-        # Query APIs
-        results = {
-            'scan_data': processed_data,
-            'shodan_results': self.query_shodan(ip_address),
-            'virustotal_results': self.query_virustotal({'ip': ip_address}),
-            'nvd_results': self.query_nvd(cve_list),
-            'cisa_kev_results': self.query_cisa_kev()
-        }
+        print("Collecting threat intelligence from all sources...")
+        results = self.collect_intelligence(processed_data)
         
         print("Generating visual analytics...")
         visuals = self.generate_visual_analytics(results)
         
         # Generate summary and recommendations
-        summary = self.generate_summary(results, visuals)
+        summary = self.generate_summary(results)
         recommendations = self.generate_recommendations(results)
         risk_assessment = self.generate_risk_assessment(results, summary)
         
@@ -554,7 +338,7 @@ class ThreatIntelligenceEngine:
         threat_report = {
             'metadata': {
                 'generated_at': datetime.now().isoformat(),
-                'data_sources': list(self.apis.keys()),
+                'data_sources': list(self.clients.keys()),
                 'demo_mode': self.demo_mode,
                 'layer1_input_summary': {
                     'host': processed_data.get('host'),
@@ -570,25 +354,22 @@ class ThreatIntelligenceEngine:
         }
         
         return threat_report
-
+    
     def save_report(self, report: Dict, filename: str = None) -> str:
         """Save report to JSON file in current directory"""
-        # Use current directory
         current_dir = os.getcwd()
         
-        # Create filename with timestamp
         if filename is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"threat_intelligence_report_{timestamp}.json"
         
-        # Join current directory with filename
         filepath = os.path.join(current_dir, filename)
         
-        # Save the report
         with open(filepath, 'w') as f:
             json.dump(report, f, indent=2, default=str)
         
-        return filepath  # Return full path
+        return filepath
+    
     def print_report_summary(self, report: Dict):
         """Print a formatted summary of the report"""
         print("\n" + "="*60)
@@ -625,61 +406,3 @@ class ThreatIntelligenceEngine:
         print(f"\n📁 Report generated: {report.get('metadata', {}).get('generated_at', 'Unknown')}")
         print(f"   Demo Mode: {report.get('metadata', {}).get('demo_mode', False)}")
         print("="*60)
-
-
-def main():
-    """Main execution function"""
-    print("Starting Threat Intelligence Analysis...")
-    print("="*60)
-    
-    # Initialize engine
-    threat_engine = ThreatIntelligenceEngine()
-    
-    if threat_engine.demo_mode:
-        print("⚠️  DEMO MODE - Using simulated responses")
-        print("   To use real APIs, add your API keys to .env file")
-        print("   Required: SHODAN_API_KEY, VIRUSTOTAL_API_KEY")
-        print()
-    
-    # Generate threat report
-    try:
-        threat_report = threat_engine.generate_threat_report()
-        
-        # Save report (now it will save to current directory)
-        filename = threat_engine.save_report(threat_report)
-        
-        # Print summary
-        threat_engine.print_report_summary(threat_report)
-        
-        # Show where to find full report
-        print(f"\n✅ Full report saved to: {os.path.abspath(filename)}")
-        
-        # Verify it's in current directory
-        current_dir = os.getcwd()
-        saved_dir = os.path.dirname(os.path.abspath(filename))
-        if saved_dir == current_dir:
-            print(f"📁 Location: Current working directory ({current_dir})")
-        # Optionally display CVE details
-        response = input("\nView detailed CVE information? (y/n): ").lower()
-        if response == 'y':
-            print("\nDetailed CVE Analysis:")
-            print("-"*40)
-            nvd_data = threat_report['threat_intelligence']['nvd_results']['data']
-            for cve_id, details in nvd_data.items():
-                if isinstance(details, dict):
-                    print(f"\n🔹 {cve_id}")
-                    desc = details.get('description', 'N/A')
-                    if len(desc) > 100:
-                        desc = desc[:100] + "..."
-                    print(f"   Description: {desc}")
-                    print(f"   CVSS Score: {details.get('cvss_metrics', {}).get('baseScore', 'N/A')}")
-                    print(f"   Severity: {details.get('severity', 'N/A')}")
-                    print(f"   Published: {details.get('published_date', 'N/A')}")
-    
-    except Exception as e:
-        print(f"\n❌ Error generating report: {e}")
-        print("Please check your internet connection and API keys.")
-
-
-if __name__ == "__main__":
-    main()
