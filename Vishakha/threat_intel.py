@@ -5,8 +5,8 @@ import os
 # ---------------------------
 # CONFIG: ADD YOUR API KEYS
 # ---------------------------
-SHODAN_API_KEY = "key"
-VT_API_KEY = "key"
+SHODAN_API_KEY = "6nVnxyiNFadecnjUqeJWbEGlf0ub8lOz"
+VT_API_KEY = "3ed80728e4d4cde21539d8e34c0556dca327f56180980c4276f8b0a36e2f4fdb"
 VULNERS_API_KEY = ""   # optional
 
 # ---------------------------
@@ -16,10 +16,7 @@ def scan_shodan(ip):
     try:
         url = f"https://api.shodan.io/shodan/host/{ip}?key={SHODAN_API_KEY}"
         response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": response.status_code}
+        return response.json()
     except Exception as e:
         return {"exception": str(e)}
 
@@ -31,10 +28,7 @@ def scan_virustotal(file_hash):
         url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
         headers = {"x-apikey": VT_API_KEY}
         response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": response.status_code}
+        return response.json()
     except Exception as e:
         return {"exception": str(e)}
 
@@ -45,10 +39,7 @@ def fetch_cisa_kev():
     try:
         url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
         response = requests.get(url)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": response.status_code}
+        return response.json()
     except Exception as e:
         return {"exception": str(e)}
 
@@ -57,7 +48,6 @@ def fetch_cisa_kev():
 # ---------------------------
 def scan_vulners():
     try:
-        # Example payload, can be customized
         url = "https://vulners.com/api/v3/burp/software/"
         payload = {
             "os": "windows",
@@ -66,10 +56,7 @@ def scan_vulners():
         }
         headers = {"Content-Type": "application/json"}
         response = requests.post(url, json=payload, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": response.status_code}
+        return response.json()
     except Exception as e:
         return {"exception": str(e)}
 
@@ -78,54 +65,25 @@ def scan_vulners():
 # ---------------------------
 def save_to_json(filename, data):
     try:
-        with open(filename, "w") as f:
+        os.makedirs("outputs", exist_ok=True)
+        filepath = os.path.join("outputs", filename)
+
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
-        print(f"\n📁 Results saved to {filename}")
+
+        print(f"📁 Results saved to {filepath}")
     except Exception as e:
-        print("\n❌ Error saving JSON:", e)
+        print("❌ Error saving JSON:", e)
 
 # ---------------------------
-# 6️⃣ GENERATE TXT REPORT
-# ---------------------------
-def generate_report(filename, results):
-    try:
-        with open(filename, "w") as f:
-            f.write("======= THREAT INTELLIGENCE REPORT =======\n\n")
-
-            f.write("----- SHODAN RESULT -----\n")
-            f.write(json.dumps(results.get("shodan", {}), indent=2))
-            f.write("\n\n")
-
-            f.write("----- VIRUSTOTAL RESULT -----\n")
-            f.write(json.dumps(results.get("virustotal", {}), indent=2))
-            f.write("\n\n")
-
-            f.write("----- CISA KEV DATA -----\n")
-            f.write(json.dumps(results.get("cisa_kev", {}), indent=2))
-            f.write("\n\n")
-
-            f.write("----- VULNERS RESULT -----\n")
-            f.write(json.dumps(results.get("vulners", {}), indent=2))
-            f.write("\n\n")
-
-        print(f"📄 Report saved to {filename}")
-    except Exception as e:
-        print("\n❌ Error generating report:", e)
-
-# ---------------------------
-# 7️⃣ MAIN EXECUTION
+# 6️⃣ MAIN EXECUTION
 # ---------------------------
 def main():
     print("\n==============================")
     print("  🔥 THREAT INTELLIGENCE TOOL")
     print("==============================")
 
-    results = {
-        "shodan": {},
-        "virustotal": {},
-        "cisa_kev": {},
-        "vulners": {}
-    }
+    results = {}
 
     # Shodan
     ip = input("\nEnter IP to scan with Shodan: ")
@@ -142,22 +100,18 @@ def main():
     results["cisa_kev"] = fetch_cisa_kev()
     print("✅ CISA KEV fetched")
 
-    # Vulners (optional)
+    # Vulners
     print("\nRunning Vulners scan...")
     results["vulners"] = scan_vulners()
     print("✅ Vulners scan completed")
 
-    # Save JSON
+    # Save JSON only
     save_to_json("threat_intel_output.json", results)
 
-    # Generate TXT report
-    generate_report("threat_intel_report.txt", results)
-
-    print("\n✔ All modules executed and reports created successfully!")
+    print("\n✔ All modules executed successfully!")
 
 # ---------------------------
 # RUN SCRIPT
 # ---------------------------
 if __name__ == "__main__":
     main()
-
