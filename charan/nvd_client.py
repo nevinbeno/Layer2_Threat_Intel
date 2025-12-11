@@ -12,12 +12,12 @@ class NVDClient:
         """Query NVD for CVE details"""
         results = {}
         
-        for cve_id in cve_list[:5]:  # Limit requests for demo
+        for cve_id in cve_list[:10]:  # Increased limit for real use
             try:
                 result = self._query_single_cve(cve_id)
                 if result:
                     results[cve_id] = result
-                time.sleep(1)  # NVD rate limiting
+                time.sleep(0.6)  # NVD rate limiting (max 5 requests per 3 seconds)
             except Exception as e:
                 results[cve_id] = {'error': str(e)}
         
@@ -117,42 +117,3 @@ class NVDClient:
         elif score > 0:
             return 'LOW'
         return 'INFO'
-    
-    def get_demo_data(self, cve_list: List[str]) -> Dict[str, Any]:
-        """Get demo CVE data for testing"""
-        demo_data = {
-            'CVE-2021-44228': {
-                'description': 'Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases 2.12.2, 2.12.3, and 2.3.1) JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints.',
-                'published_date': '2021-12-10T20:15:00Z',
-                'cvss_metrics': {'baseScore': 10.0, 'baseSeverity': 'CRITICAL', 'version': '3.1'},
-                'severity': 'CRITICAL',
-                'cwe_list': ['CWE-502']
-            },
-            'CVE-2022-22965': {
-                'description': 'Spring Framework prior to versions 5.3.18 and 5.2.20 and corresponding older versions suffers from a remote code execution vulnerability.',
-                'published_date': '2022-03-31T19:15:00Z',
-                'cvss_metrics': {'baseScore': 9.8, 'baseSeverity': 'CRITICAL', 'version': '3.1'},
-                'severity': 'CRITICAL',
-                'cwe_list': ['CWE-94']
-            },
-            'CVE-2021-41617': {
-                'description': 'sshd in OpenSSH 6.2 through 8.7 allows remote attackers to cause a denial of service.',
-                'published_date': '2021-09-15T07:15:00Z',
-                'cvss_metrics': {'baseScore': 7.5, 'baseSeverity': 'HIGH', 'version': '3.1'},
-                'severity': 'HIGH',
-                'cwe_list': ['CWE-400']
-            }
-        }
-        
-        results = {}
-        for cve in cve_list:
-            if cve in demo_data:
-                results[cve] = demo_data[cve]
-            else:
-                results[cve] = {
-                    'description': f'Demo description for {cve}',
-                    'cvss_metrics': {'baseScore': 5.0, 'severity': 'MEDIUM'},
-                    'severity': 'MEDIUM'
-                }
-        
-        return {'success': True, 'data': results}

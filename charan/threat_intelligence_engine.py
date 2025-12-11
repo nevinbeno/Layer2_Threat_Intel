@@ -14,20 +14,24 @@ from nvd_client import NVDClient
 class ThreatIntelligenceEngine:
     def __init__(self):
         """Initialize all threat intelligence clients"""
-        self.clients = {
-            'shodan': ShodanClient(),
-            'virustotal': VirusTotalClient(),
-            'cisa_kev': CISAKEVClient(),
-            'vulners': VulnersClient(),
-            'nvd': NVDClient()
-        }
-        
-        # Demo mode flag
-        self.demo_mode = (
-            self.clients['shodan'].demo_mode or
-            self.clients['virustotal'].demo_mode or
-            self.clients['vulners'].demo_mode
-        )
+        try:
+            self.clients = {
+                'shodan': ShodanClient(),
+                'virustotal': VirusTotalClient(),
+                'cisa_kev': CISAKEVClient(),
+                'vulners': VulnersClient(),
+                'nvd': NVDClient()
+            }
+            
+            # Check if all required API keys are available
+            self.api_keys_available = True
+        except ValueError as e:
+            print(f"⚠️ API Key Error: {e}")
+            print("Please add the required API keys to your .env file:")
+            print("  - SHODAN_API_KEY")
+            print("  - VIRUSTOTAL_API_KEY")
+            print("  - VULNERS_API_KEY")
+            raise
     
     def process_layer1_data(self, scan_data: Dict = None) -> Dict[str, Any]:
         """Process sample data from Layer 1 (Vulnerability Scanning)"""
@@ -55,7 +59,13 @@ class ThreatIntelligenceEngine:
                 "asset_value": "critical"
             }
         }
-        return scan_data if scan_data else default_data
+        
+        if scan_data:
+            # Validate and merge with default structure
+            result = default_data.copy()
+            result.update(scan_data)
+            return result
+        return default_data
     
     def collect_intelligence(self, processed_data: Dict) -> Dict[str, Any]:
         """Collect intelligence from all sources"""
@@ -159,6 +169,17 @@ class ThreatIntelligenceEngine:
                 'location': shodan_data.get('location', {})
             }
         
+        # 5. VirusTotal Summary
+        vt_data = results.get('virustotal', {}).get('data', {}).get('ip_analysis', {})
+        if vt_data:
+            visuals['virustotal_summary'] = {
+                'type': 'reputation_summary',
+                'malicious': vt_data.get('malicious', 0),
+                'suspicious': vt_data.get('suspicious', 0),
+                'harmless': vt_data.get('harmless', 0),
+                'reputation_score': vt_data.get('reputation', 0)
+            }
+        
         return visuals
     
     def generate_summary(self, results: Dict) -> Dict[str, Any]:
@@ -221,6 +242,7 @@ class ThreatIntelligenceEngine:
         kev_data = results.get('cisa_kev', {}).get('data', {})
         scan_data = results.get('scan_data', {})
         shodan_data = results.get('shodan', {}).get('data', {})
+        vt_data = results.get('virustotal', {}).get('data', {}).get('ip_analysis', {})
         
         # Check critical CVEs
         for cve_id, details in nvd_data.items():
@@ -245,6 +267,11 @@ class ThreatIntelligenceEngine:
             open_ports = len(shodan_data['ports'])
             if open_ports > 5:
                 recommendations.append(f"SECURE CONFIGURATION: Reduce exposed ports ({open_ports} ports visible on Shodan)")
+        
+        # Check VirusTotal reputation
+        if vt_data and isinstance(vt_data, dict):
+            if vt_data.get('malicious', 0) > 0:
+                recommendations.append(f"REPUTATION: IP has {vt_data['malicious']} malicious detections on VirusTotal")
         
         # Add general recommendations if needed
         if len(recommendations) < 3:
@@ -339,7 +366,6 @@ class ThreatIntelligenceEngine:
             'metadata': {
                 'generated_at': datetime.now().isoformat(),
                 'data_sources': list(self.clients.keys()),
-                'demo_mode': self.demo_mode,
                 'layer1_input_summary': {
                     'host': processed_data.get('host'),
                     'vulnerability_count': len(processed_data.get('vulnerabilities', [])),
@@ -404,5 +430,4 @@ class ThreatIntelligenceEngine:
         print(f"   • {visual_count} visual analytics components created")
         
         print(f"\n📁 Report generated: {report.get('metadata', {}).get('generated_at', 'Unknown')}")
-        print(f"   Demo Mode: {report.get('metadata', {}).get('demo_mode', False)}")
         print("="*60)

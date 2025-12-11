@@ -7,17 +7,12 @@ def main():
     print("Starting Threat Intelligence Analysis...")
     print("="*60)
     
-    # Initialize engine
-    threat_engine = ThreatIntelligenceEngine()
-    
-    if threat_engine.demo_mode:
-        print("⚠️  DEMO MODE - Using simulated responses")
-        print("   To use real APIs, add your API keys to .env file")
-        print("   Required: SHODAN_API_KEY, VIRUSTOTAL_API_KEY, VULNERS_API_KEY")
-        print()
-    
-    # Generate threat report
     try:
+        # Initialize engine
+        threat_engine = ThreatIntelligenceEngine()
+        
+        # Generate threat report
+        print("\n🔍 Collecting Threat Intelligence...")
         threat_report = threat_engine.generate_threat_report()
         
         # Save report
@@ -42,7 +37,7 @@ def main():
             print("-"*40)
             nvd_data = threat_report['threat_intelligence']['nvd']['data']
             for cve_id, details in nvd_data.items():
-                if isinstance(details, dict):
+                if isinstance(details, dict) and 'error' not in details:
                     print(f"\n🔹 {cve_id}")
                     desc = details.get('description', 'N/A')
                     if len(desc) > 100:
@@ -51,6 +46,17 @@ def main():
                     print(f"   CVSS Score: {details.get('cvss_metrics', {}).get('baseScore', 'N/A')}")
                     print(f"   Severity: {details.get('severity', 'N/A')}")
                     print(f"   Published: {details.get('published_date', 'N/A')}")
+    
+    except ValueError as e:
+        print(f"\n❌ Configuration Error: {e}")
+        print("\nPlease create a .env file with the following API keys:")
+        print("SHODAN_API_KEY=your_shodan_key_here")
+        print("VIRUSTOTAL_API_KEY=your_virustotal_key_here")
+        print("VULNERS_API_KEY=your_vulners_key_here")
+        print("\nYou can get API keys from:")
+        print("- Shodan: https://account.shodan.io")
+        print("- VirusTotal: https://www.virustotal.com/gui/join-us")
+        print("- Vulners: https://vulners.com/features")
     
     except Exception as e:
         print(f"\n❌ Error generating report: {e}")

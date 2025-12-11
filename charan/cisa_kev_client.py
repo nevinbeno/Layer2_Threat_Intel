@@ -1,7 +1,6 @@
 # cisa_kev_client.py
 import requests
 from typing import Dict, List, Any
-from datetime import datetime
 
 class CISAKEVClient:
     def __init__(self):
@@ -14,9 +13,17 @@ class CISAKEVClient:
             if response.status_code == 200:
                 data = response.json()
                 return self._process_kev_data(data)
-            return {'success': False, 'error': f'HTTP {response.status_code}', 'data': {}}
+            return {
+                'success': False, 
+                'error': f'HTTP {response.status_code}', 
+                'data': {}
+            }
         except Exception as e:
-            return {'success': False, 'error': str(e), 'data': {}}
+            return {
+                'success': False, 
+                'error': str(e), 
+                'data': {}
+            }
     
     def _process_kev_data(self, data: Dict) -> Dict[str, Any]:
         """Process KEV data into structured format"""
