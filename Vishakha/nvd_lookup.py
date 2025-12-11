@@ -1,25 +1,28 @@
 import requests
 import json
+from dotenv import load_dotenv
+import os
 
-def fetch_cve(cve_id):
+load_dotenv()
+NVD_API_KEY = os.getenv("NVD_API_KEY")
+
+def get_cve_details(cve_id):
     url = f"https://services.nvd.nist.gov/rest/json/cve/2.0/{cve_id}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    headers = {
+        "apiKey": NVD_API_KEY,
+        "User-Agent": "ThreatIntel/1.0"
+    }
+    response = requests.get(url, headers=headers)
 
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if "vulnerabilities" in data and len(data["vulnerabilities"]) > 0:
-                vuln = data["vulnerabilities"][0]["cve"]
-                print(f"CVE ID: {vuln['id']}")
-                print(f"Description: {vuln['descriptions'][0]['value']}")
-                print(f"Published: {vuln['published']}")
-            else:
-                print("❌ CVE not found in NVD database!")
-        else:
-            print(f"❌ HTTP Error {response.status_code}")
-    except Exception as e:
-        print("❌ Exception:", e)
+    if response.status_code == 200:
+        data = response.json()
+        return data
+    else:
+        print("Error:", response.status_code)
+        return None
 
-# Test with a real CVE
-fetch_cve("CVE-2021-44228")
+cve = input("Enter CVE ID: ")
+output = get_cve_details(cve)
+
+if output:
+    print(json.dumps(output, indent=2))
