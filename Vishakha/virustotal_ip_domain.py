@@ -1,7 +1,7 @@
 import requests
 import json
 
-API_KEY = "3ed80728e4d4cde21539d8e34c0556dca327f56180980c4276f8b0a36e2f4fdb"
+API_KEY = "key"
 
 # --------- IP SCAN ---------
 ip = "8.8.8.8"
@@ -57,3 +57,4 @@ if domain_response.status_code == 200:
 
 else:
     print("Error in Domain Scan")
+
