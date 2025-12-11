@@ -5,8 +5,8 @@ import os
 # ---------------------------
 # CONFIG: ADD YOUR API KEYS
 # ---------------------------
-SHODAN_API_KEY = "6nVnxyiNFadecnjUqeJWbEGlf0ub8lOz"
-VT_API_KEY = "3ed80728e4d4cde21539d8e34c0556dca327f56180980c4276f8b0a36e2f4fdb"
+SHODAN_API_KEY = "key"
+VT_API_KEY = "key"
 VULNERS_API_KEY = ""   # optional
 
 # ---------------------------
@@ -160,3 +160,4 @@ def main():
 # ---------------------------
 if __name__ == "__main__":
     main()
+
