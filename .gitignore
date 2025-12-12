@@ -28,3 +28,6 @@ shodan_output/
 
 # documentations
 *.pdf
+#apikeysgit status
+
+.env
