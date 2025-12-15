@@ -3,6 +3,7 @@ from datetime import datetime
 
 from core.input_parser import InputParser
 from core.validator import Validator
+from core.risk_summary_builder import build_risk_input
 
 from tools.shodan_tool import ShodanTool
 from tools.virustotal_tool import VirusTotalTool
@@ -16,7 +17,7 @@ class ThreatIntelPipeline:
         self.parser = InputParser()
         self.validator = Validator()
 
-        # Initialize tools (do NOT disable if key missing)
+        # Initialize tools (safe init)
         self.shodan = self._init_tool(ShodanTool)
         self.virustotal = self._init_tool(VirusTotalTool)
 
@@ -59,17 +60,33 @@ class ThreatIntelPipeline:
             "cisa_kev": self.cisa.query(cves)
         }
 
-        # Level-2 output
-        with open("output/level2.json", "w") as f:
-            json.dump({
-                "asset": asset,
-                "vulnerabilities": vulns,
-                "intelligence": intel,
-                "generated_at": datetime.utcnow().isoformat()
-            }, f, indent=2)
+        # =========================
+        # FULL LAYER-2 OUTPUT
+        # =========================
+        level2_output = {
+            "asset": asset,
+            "vulnerabilities": vulns,
+            "intelligence": intel,
+            "generated_at": datetime.utcnow().isoformat()
+        }
 
-        # Dashboard output
+        with open("output/level2.json", "w") as f:
+            json.dump(level2_output, f, indent=2)
+
+        # =========================
+        # LAYER-3 RISK INPUT
+        # =========================
+        risk_input = build_risk_input(level2_output)
+
+        with open("output/risk_input.json", "w") as f:
+            json.dump(risk_input, f, indent=2)
+
+        # =========================
+        # DASHBOARD OUTPUT
+        # =========================
         dashboard = self._generate_dashboard_summary(asset, vulns, intel)
+
+
         with open("output/dashboard_summary.json", "w") as f:
             json.dump(dashboard, f, indent=2)
 
@@ -79,7 +96,6 @@ class ThreatIntelPipeline:
     # EXECUTE TOOL (REAL OR FALLBACK)
     # ==================================================
     def _execute_tool(self, tool, target):
-        # Fallback mode (API key missing)
         if isinstance(tool, dict) and tool.get("fallback"):
             return {
                 "executed": True,
@@ -154,7 +170,7 @@ class ThreatIntelPipeline:
         }
 
     # ==================================================
-    # TOOL STATUS (ALL 5 ALWAYS EXECUTED)
+    # TOOL STATUS
     # ==================================================
     def _tool_status(self, intel):
         status = {}
