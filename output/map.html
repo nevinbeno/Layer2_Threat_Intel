@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Shodan World Exposure Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            margin: 0;
+            background-color: #0f172a;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .popup {
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .popup b {
+            color: #38bdf8;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 1000;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <!-- Status panel -->
+    <div id="status" class="status">Loading map data...</div>
+
+    <!-- Info panel -->
+    <div class="info-panel">
+        <h3 style="margin-top: 0; color: #38bdf8;">🌍 Shodan Exposure Map</h3>
+        <p>Showing SSH servers (port 22) discovered by Shodan.</p>
+        <div id="stats">
+            <p><b>Points:</b> <span id="point-count">0</span></p>
+            <p><b>Query:</b> <span id="query-info">port:22</span></p>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8;">
+            Click on markers to see details
+        </p>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --------------------------------------------------
+        // MAP INITIALIZATION
+        // --------------------------------------------------
+        const map = L.map("map", {
+            worldCopyJump: true
+        }).setView([20, 0], 2);
+
+        // Dark theme tiles (same style as your screenshot)
+        L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            {
+                attribution: "&copy; OpenStreetMap & CARTO",
+                subdomains: "abcd",
+                maxZoom: 19
+            }
+        ).addTo(map);
+
+        // Update status
+        const statusEl = document.getElementById('status');
+        const pointCountEl = document.getElementById('point-count');
+        const queryInfoEl = document.getElementById('query-info');
+
+        // --------------------------------------------------
+        // LOAD SHODAN MAP DATA
+        // --------------------------------------------------
+        function loadMapData() {
+            statusEl.textContent = "Loading map data...";
+
+            // Try different paths - adjust based on your file structure
+            const possiblePaths = [
+                "shodan_map_points.json",                // Same directory
+                "./shodan_map_points.json",              // Same directory
+                "output/shodan_map_points.json",         // Output subdirectory
+                "./output/shodan_map_points.json",       // Output subdirectory
+                "../output/shodan_map_points.json"       // Parent/output directory
+            ];
+
+            // Try each path until one works
+            function tryFetch(paths, index = 0) {
+                if (index >= paths.length) {
+                    statusEl.textContent = "❌ Failed to load map data";
+                    console.error("All paths failed");
+                    return;
+                }
+
+                const path = paths[index];
+                console.log(`Trying path: ${path}`);
+
+                fetch(path)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(`✅ Successfully loaded from: ${path}`);
+                        console.log(`Data loaded: ${data.total_points} points`);
+
+                        // Update UI
+                        statusEl.textContent = `✅ Loaded ${data.total_points} points`;
+                        pointCountEl.textContent = data.total_points;
+                        if (data.query) {
+                            queryInfoEl.textContent = data.query;
+                        }
+
+                        if (!data.points || data.points.length === 0) {
+                            statusEl.textContent = "❌ No points available in data";
+                            console.warn("Data has no points:", data);
+                            return;
+                        }
+
+                        // Add markers to map
+                        let markersAdded = 0;
+                        data.points.forEach(point => {
+                            if (!point.lat || !point.lon) {
+                                console.warn("Point missing coordinates:", point);
+                                return;
+                            }
+
+                            // Create marker with custom icon
+                            const marker = L.marker([point.lat, point.lon], {
+                                title: point.ip
+                            }).addTo(map);
+
+                            // Build popup content
+                            const popupContent = `
+                                <div class="popup">
+                                    <b>IP:</b> ${point.ip}<br/>
+                                    <b>Organization:</b> ${point.org || "N/A"}<br/>
+                                    <b>Country:</b> ${point.country || "N/A"}<br/>
+                                    <b>City:</b> ${point.city || "N/A"}<br/>
+                                    <b>Product:</b> ${point.product || "Unknown"}<br/>
+                                    <b>Open Ports:</b> ${point.ports && point.ports.length ? point.ports.join(", ") : "None detected"}<br/>
+                                    ${point.timestamp ? `<b>Scanned:</b> ${new Date(point.timestamp).toLocaleString()}<br/>` : ''}
+                                </div>
+                            `;
+
+                            marker.bindPopup(popupContent);
+                            markersAdded++;
+                        });
+
+                        console.log(`✅ Added ${markersAdded} markers to map`);
+                        statusEl.textContent = `✅ ${markersAdded} markers added`;
+
+                        // If markers were added, fit bounds
+                        if (markersAdded > 0) {
+                            const group = new L.featureGroup(data.points
+                                .filter(p => p.lat && p.lon)
+                                .map(p => L.marker([p.lat, p.lon]))
+                            );
+                            map.fitBounds(group.getBounds().pad(0.1));
+                        }
+
+                    })
+                    .catch(err => {
+                        console.warn(`Failed with path ${path}:`, err.message);
+                        // Try next path
+                        tryFetch(paths, index + 1);
+                    });
+            }
+
+            // Start trying paths
+            tryFetch(possiblePaths);
+        }
+
+        // Start loading data
+        loadMapData();
+
+        // Add click handler for status panel
+        statusEl.style.cursor = 'pointer';
+        statusEl.addEventListener('click', function () {
+            loadMapData(); // Reload data on click
+        });
+    </script>
+
+</body>
+
+</html>
