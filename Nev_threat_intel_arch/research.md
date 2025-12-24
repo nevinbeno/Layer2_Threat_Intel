@@ -24,3 +24,4 @@ This research focuses on designing a Threat Intelligence Layer (Layer-2) that:
 Hence, Layer-2 acts as the decision-making brain of the security architecture.
 
 ## Implementation of the "Brain"
+Being a layer which is as wide as an ocean, the next task was to organise the Threat Intelligence. We planned to have a 3 - Level intelligence: **Exposure Intelligence, Malware Intelligence, Vulnerability Intelligence**. 
