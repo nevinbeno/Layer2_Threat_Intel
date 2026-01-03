@@ -1,0 +1,69 @@
+{
+    "scan_metadata": {
+        "scan_id": "scan-2025-01-15-001",
+        "scan_time": "2025-01-15T17:10:00Z",
+        "scanner_layer": "Discovery & Vulnerability Scanning",
+        "tools_used": [
+            "Nmap",
+            "OpenVAS"
+        ],
+        "scan_type": "unauthenticated"
+    },
+    "asset": {
+        "ip": "45.33.32.156",
+        "hostname": "scanme.nmap.org",
+        "asset_type": "Public Server",
+        "environment": "Demo",
+        "exposure": "Public"
+    },
+    "network_surface": {
+        "open_ports": [
+            {
+                "port": 22,
+                "protocol": "tcp",
+                "service": "ssh",
+                "product": "OpenSSH",
+                "version": "6.6.1p1"
+            },
+            {
+                "port": 80,
+                "protocol": "tcp",
+                "service": "http",
+                "product": "Apache httpd",
+                "version": "2.4.7"
+            }
+        ]
+    },
+    "vulnerabilities": [
+        {
+            "cve": "CVE-2019-0211",
+            "title": "Apache HTTP Server privilege escalation",
+            "severity": "HIGH",
+            "cvss_score": 7.8,
+            "affected_port": 80,
+            "service": "http",
+            "scanner": "OpenVAS"
+        },
+        {
+            "cve": "CVE-2018-15473",
+            "title": "OpenSSH user enumeration vulnerability",
+            "severity": "MEDIUM",
+            "cvss_score": 5.3,
+            "affected_port": 22,
+            "service": "ssh",
+            "scanner": "OpenVAS"
+        }
+    ],
+    "summary": {
+        "total_open_ports": 2,
+        "total_vulnerabilities": 2,
+        "critical_count": 0,
+        "high_count": 1,
+        "medium_count": 1,
+        "low_count": 0
+    },
+    "risk_hint": {
+        "overall_risk": "HIGH",
+        "reason": "High severity vulnerability detected on publicly exposed HTTP service"
+    }
+}
