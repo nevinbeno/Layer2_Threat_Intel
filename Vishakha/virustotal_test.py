@@ -1,7 +1,7 @@
 import requests
 
 api_key = "key"
-hash_value = "44d88612fea8a8f36de82e1278abb02f"  # test hash
+hash_value = ""  # test hash
 
 url = f"https://www.virustotal.com/api/v3/files/{hash_value}"
 
@@ -31,4 +31,5 @@ print("Malicious:", stats.get("malicious"))
 print("Suspicious:", stats.get("suspicious"))
 print("Undetected:", stats.get("undetected"))
 print("Harmless:", stats.get("harmless"))
+
 
