@@ -1,69 +1,56 @@
 {
-    "scan_metadata": {
-        "scan_id": "scan-2025-01-15-001",
-        "scan_time": "2025-01-15T17:10:00Z",
-        "scanner_layer": "Discovery & Vulnerability Scanning",
-        "tools_used": [
-            "Nmap",
-            "OpenVAS"
-        ],
-        "scan_type": "unauthenticated"
-    },
-    "asset": {
-        "ip": "45.33.32.156",
-        "hostname": "scanme.nmap.org",
-        "asset_type": "Public Server",
-        "environment": "Demo",
-        "exposure": "Public"
-    },
-    "network_surface": {
-        "open_ports": [
-            {
-                "port": 22,
-                "protocol": "tcp",
-                "service": "ssh",
-                "product": "OpenSSH",
-                "version": "6.6.1p1"
-            },
-            {
-                "port": 80,
-                "protocol": "tcp",
-                "service": "http",
-                "product": "Apache httpd",
-                "version": "2.4.7"
-            }
-        ]
-    },
-    "vulnerabilities": [
+    "scan_time_utc": "2026-01-03 09:44:05,610",
+    "scanner_layer": "Discovery & Port Scanning",
+    "target": "127.1.1.1",
+    "scan_command": "-sT -sV -T3 -top-ports 10484 --version-intensity 7 --open --max-retries 3 --host-timeout 90s",
+    "total_hosts": 1,
+    "total_open_ports": 7,
+    "assets": [
         {
-            "cve": "CVE-2019-0211",
-            "title": "Apache HTTP Server privilege escalation",
-            "severity": "HIGH",
-            "cvss_score": 7.8,
-            "affected_port": 80,
-            "service": "http",
-            "scanner": "OpenVAS"
-        },
-        {
-            "cve": "CVE-2018-15473",
-            "title": "OpenSSH user enumeration vulnerability",
-            "severity": "MEDIUM",
-            "cvss_score": 5.3,
-            "affected_port": 22,
-            "service": "ssh",
-            "scanner": "OpenVAS"
+            "ip": "127.1.1.1",
+            "hostname": "",
+            "state": "up",
+            "open_ports": [
+                {
+                    "port_no": 135,
+                    "protocol": "tcp",
+                    "service": "msrpc",
+                    "product": "Microsoft Windows RPC",
+                    "version": "",
+                    "cve": {
+                        "id": "CVE-2000-0771",
+                        "description": "Microsoft Windows 2000 allows local users to cause a denial of service by corrupting the local security policy via malformed RPC traffic, aka the \"Local Security Policy Corruption\" vulnerability.",
+                        "cvss": null,
+                        "severity": "UNKNOWN"
+                    }
+                },
+                {
+                    "port_no": 3306,
+                    "protocol": "tcp",
+                    "service": "mysql",
+                    "product": "MySQL",
+                    "version": "8.0.37",
+                    "cve": {
+                        "id": "CVE-2024-20996",
+                        "description": "Vulnerability in the MySQL Server product of Oracle MySQL (component: InnoDB). Supported versions that are affected are 8.0.37 and prior and 8.4.0 and prior. Easily exploitable vulnerability allows high privileged attacker with network access via multiple protocols to compromise MySQL Server. Successful attacks of this vulnerability can result in unauthorized ability to cause a hang or frequently repeatable crash (complete DOS) of MySQL Server. CVSS 3.1 Base Score 4.9 (Availability impacts). CVSS Vector: (CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:N/I:N/A:H).",
+                        "cvss": 4.9,
+                        "severity": "MEDIUM"
+                    }
+                },
+                {
+                    "port_no": 8050,
+                    "protocol": "tcp",
+                    "service": "http",
+                    "product": "Apache Tomcat",
+                    "version": "",
+                    "cve": {
+                        "id": "CVE-2000-0759",
+                        "description": "Jakarta Tomcat 3.1 under Apache reveals physical path information when a remote attacker requests a URL that does not exist, which generates an error message that includes the physical path.",
+                        "cvss": null,
+                        "severity": "UNKNOWN"
+                    }
+                }
+            ]
         }
-    ],
-    "summary": {
-        "total_open_ports": 2,
-        "total_vulnerabilities": 2,
-        "critical_count": 0,
-        "high_count": 1,
-        "medium_count": 1,
-        "low_count": 0
-    },
-    "risk_hint": {
-        "overall_risk": "HIGH",
-        "reason": "High severity vulnerability detected on publicly exposed HTTP service"
-    }
+    ]
 }
